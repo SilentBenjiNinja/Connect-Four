@@ -1,0 +1,49 @@
+body {
+    background-color: #140C1C;
+    height: 90vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#display>* {
+    margin: 20px auto 10px;
+    border: 8px solid #DEEED6;
+}
+
+
+/*
+
+#140C1C     ; very_dark_violet
+
+#4E4A4E     ; shadowy_lavender
+
+#757161     ; flint
+
+#8595A1     ; regent_grey
+
+#DEEED6     ; peppermint
+
+#442434     ; red_earth
+
+#854C30     ; root_beer
+
+#D04648     ; faded_red
+
+#D27D2C     ; bronze
+
+#D2AA99     ; birthday_suit
+
+#DAD45E     ; banana
+
+#30346D     ; deep_koamaru
+
+#597DCE     ; indigo
+
+#6DC2CA     ; cadet_blue
+
+#346524     ; hunter_green
+
+#6DAA2C     ; leaf
+
+*/
