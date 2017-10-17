@@ -22,10 +22,10 @@ var InitFieldSize = 64;
 
 //Values for board fields; 0 = vacant, 1 = P1, 2 = P2, ...
 var ArrayFieldValues = [],
-    i;
+    i,
+    j;
 for (i = 0; i < InitBoardWidth; i += 1) {
     ArrayFieldValues[i] = [];
-    var j;
     for (j = 0; j < InitBoardHeight; j += 1) {
         ArrayFieldValues[i][j] = 0;
     }
@@ -77,7 +77,7 @@ function isSlotOccupied(SlotIndex) {
     }
 }
 
-//Return true if given index is in bounds of width or height
+//Return true if given index is in bounds of width or height (depending on given axis)
 function isIndexValid(Index, Axis) {
     var comp,
         isValid;
@@ -128,6 +128,7 @@ function winGame() {
 //Execute when game ends in a tie
 function tieGame() {
     console.log("Tie Game");
+    GameOver = true;
 }
 
 //After player turns, check for win condition, return boolean
@@ -204,7 +205,7 @@ function dropChip(SlotIndex) {
     FieldsVacant -= 1;
     ArrayFieldValues[SlotIndex][SlotField] = PlayerTurn;
     chipToBoard(SlotIndex, SlotField);
-    console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped a chip at [x: " + SlotIndex + "; y: " + SlotField + "]");
+    //console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped at [x: " + SlotIndex + "; y: " + SlotField + "]");
     if (!checkWin(SlotIndex, SlotField)) {
         if (!checkTie()) {
             nextPlayersTurn();
@@ -251,29 +252,70 @@ document.getElementById('display').appendChild(renderer.view);
 var Stage = new PIXI.Container();
 
 //Resource aliases
-var FieldVac = "img/field_vacant.png";
+var FieldVac = "img/field.png";
 var ChipBlu = "img/chip_blue.png";
 var ChipRed = "img/chip_red.png";
+var DropBlu = "img/chip_drop_blue.png";
+var DropRed = "img/chip_drop_red.png";
+var ShadowBlu = "img/chip_shadow_blue.png";
+var ShadowRed = "img/chip_shadow_red.png";
 
 //Create chip container
 var chips = new PIXI.Container();
 Stage.addChild(chips);
 
-//Update the visual depiction of the array when a chip has landed
+//Set sprites for falling and landing animation
 function chipToBoard(vx, vy) {
-    var source;
-    switch (ArrayFieldValues[vx][vy]) {
+    var sourceAnim,
+        sourceFinal,
+        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
+        texChip,
+        sprChip,
+        falling = true,
+        anim,
+        animSpeed = 100,
+        animLoopCounter = 0;
+    switch (PlayerTurn) {
         case 1:
-            source = ChipBlu;
+            sourceAnim = DropBlu;
+            sourceFinal = ChipBlu;
             break;
         case 2:
-            source = ChipRed;
+            sourceAnim = DropRed;
+            sourceFinal = ChipRed;
             break;
     }
-    var texChip = resources[source].texture,
-        sprChip = new PIXI.Sprite(texChip);
+    
+    texChip = resources[sourceAnim].texture;
+    texChip.frame = rect;
+    sprChip = new PIXI.Sprite(texChip);
     sprChip.x = InitFieldSize * vx;
-    sprChip.y = InitFieldSize * vy;
+    sprChip.y = 0;
+    
+    anim = setInterval(function() {
+        if (animLoopCounter == vy && falling) {
+            rect.x = InitFieldSize;
+            rect.y = 0;
+            falling = false;
+        }
+        if (rect.y > InitFieldSize * 2) {
+            if (falling) {
+                rect.y = InitFieldSize;
+            } else {
+                sprChip.texture = resources[sourceFinal].texture;
+                rect.x = 0;
+                rect.y = 0;
+                clearInterval(anim);
+            }
+        }
+        sprChip.texture.frame = rect;
+        rect.y += InitFieldSize;
+        if (falling) {
+            animLoopCounter += .5;
+            sprChip.y = animLoopCounter * InitFieldSize;
+        }
+    }, animSpeed);
+    
     chips.addChild(sprChip);
 }
 
@@ -282,25 +324,32 @@ PIXI.loader
     .add([
         FieldVac,
         ChipBlu,
-        ChipRed
+        ChipRed,
+        DropBlu,
+        DropRed,
+        ShadowBlu,
+        ShadowRed
     ])
     .load(setup);
 
-//Setup function - add the board to the stage, call feedback function
+//Setup function - add the board to the stage, create interactive slot containers, call feedback loop function
 function setup() {
     var i,
-        j;
+        j,
+        slot,
+        texField = resources[FieldVac].texture,
+        sprField;
     for (i = 0; i < InitBoardWidth; i += 1) {
-        var slot = new PIXI.Container();
+        slot = new PIXI.Container();
         clickable(slot);
         for (j = 0; j < InitBoardHeight; j += 1) {
-            var texField = resources[FieldVac].texture,
-                sprField = new PIXI.Sprite(texField);
+            sprField = new PIXI.Sprite(texField);
             sprField.x = InitFieldSize * i;
             sprField.y = InitFieldSize * j;
             slot.addChild(sprField);
         }
         Stage.addChild(slot);
+        Stage.setChildIndex(slot, 0);
     }
     
     feedbackLoop();
