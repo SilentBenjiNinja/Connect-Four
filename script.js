@@ -17,6 +17,24 @@ var InitWinCondition = 4;
 //Measurements of a field in pixels
 var InitFieldSize = 64;
 
+//Return total pixel height of the board
+function getCanvasHeight() {
+    var canvasHeight = InitBoardHeight * InitFieldSize;
+    return canvasHeight;
+}
+
+//Return total pixel width of the board
+function getCanvasWidth() {
+    var canvasWidth = InitBoardWidth * InitFieldSize;
+    return canvasWidth;
+}
+
+//Return total amount of fields on the board
+function getFieldAmount() {
+    var fieldAmount = InitBoardHeight * InitBoardWidth;
+    return fieldAmount;
+}
+
 
 /*====== In game variables - changing in game ======*/
 
@@ -46,27 +64,6 @@ var FieldsVacant = getFieldAmount();
 
 //Set to true when game is over
 var GameOver = false;
-
-
-/*====== Getters & Setters ======*/
-
-//Return total pixel height of the board
-function getCanvasHeight() {
-    var canvasHeight = InitBoardHeight * InitFieldSize;
-    return canvasHeight;
-}
-
-//Return total pixel width of the board
-function getCanvasWidth() {
-    var canvasWidth = InitBoardWidth * InitFieldSize;
-    return canvasWidth;
-}
-
-//Return total amount of fields on the board
-function getFieldAmount() {
-    var fieldAmount = InitBoardHeight * InitBoardWidth;
-    return fieldAmount;
-}
 
 //Return true if slot of given index has no vacant field
 function isSlotOccupied(SlotIndex) {
@@ -234,6 +231,9 @@ function testSlotDrop(SlotIndex) {
 
 /* G  R  A  P  H  I  C  S */
 
+//Variables
+var animFrameLength = 60;
+
 //Shortcuts
 var resources = PIXI.loader.resources;
 
@@ -273,7 +273,6 @@ function chipToBoard(vx, vy) {
         sprChip,
         falling = true,
         anim,
-        animSpeed = 100,
         animLoopCounter = 0;
     switch (PlayerTurn) {
         case 1:
@@ -314,7 +313,7 @@ function chipToBoard(vx, vy) {
             animLoopCounter += .5;
             sprChip.y = animLoopCounter * InitFieldSize;
         }
-    }, animSpeed);
+    }, animFrameLength);
     
     chips.addChild(sprChip);
 }
