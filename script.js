@@ -1,3 +1,5 @@
+"use strict";
+
 /* L  O  G  I  C */
 
 /*====== Init variables - initially set ======*/
@@ -102,30 +104,31 @@ function nextPlayersTurn() {
 
 /*====== Functions ======*/
 
-//Trigger Try Again Message on attempting to drop a chip into an occupied slot
-function tryAgainMessage(SlotIndex) {
-    console.log("Try again!");
+//Called when the game is over, calls result screen according to result parameter
+function GameEnd(Result) {
+    GameOver = true;
+    renderResultScreen(Result);
 }
 
-//If checkWin is false, check for each slot if occupied, return true if every slot is occupied
+//Execute when game ends in a tie
+function tieGame() {
+    console.log("Tie Game");
+    GameEnd(0);
+}
+
+//Execute when game is won
+function winGame() {
+    console.log("Player " + PlayerTurn + " won the game.");
+    GameEnd(PlayerTurn);
+}
+
+//If checkWin is false, check for vacant fields, return true if 0
 function checkTie() {
     if (FieldsVacant < 1) {
         return true;
     } else {
         return false;
     }
-}
-
-//Execute when game is won
-function winGame() {
-    console.log("Player " + PlayerTurn + " won the game.");
-    GameOver = true;
-}
-
-//Execute when game ends in a tie
-function tieGame() {
-    console.log("Tie Game");
-    GameOver = true;
 }
 
 //After player turns, check for win condition, return boolean
@@ -201,7 +204,6 @@ function dropChip(SlotIndex) {
     var SlotField = ArraySlotVacancy[SlotIndex];
     FieldsVacant -= 1;
     ArrayFieldValues[SlotIndex][SlotField] = PlayerTurn;
-    chipToBoard(SlotIndex, SlotField);
     //console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped at [x: " + SlotIndex + "; y: " + SlotField + "]");
     if (!checkWin(SlotIndex, SlotField)) {
         if (!checkTie()) {
@@ -212,9 +214,15 @@ function dropChip(SlotIndex) {
     } else {
         winGame();
     }
+    chipToBoard(SlotIndex, SlotField);
 }
 
-//Try dropping a chip - trigger actual drop or try again message
+//Trigger Try Again Message on attempting to drop a chip into an occupied slot
+function tryAgainMessage(SlotIndex) {
+    renderTryAgain();
+}
+
+//Try dropping a chip - trigger actual drop or try again
 function testSlotDrop(SlotIndex) {
     setPlayerInput(false);
     if (isSlotOccupied(SlotIndex)) {
@@ -222,34 +230,54 @@ function testSlotDrop(SlotIndex) {
     } else {
         dropChip(SlotIndex);
     }
-    if (!GameOver) {
-        setPlayerInput(true);
-    }
 }
 
 
 
 /* G  R  A  P  H  I  C  S */
 
-//Variables
+//Duration of one frame in milliseconds
 var animFrameLength = 60;
+
+//Root container object
+var Stage = new PIXI.Container();
+
+//Chip container
+var chips = new PIXI.Container();
+Stage.addChild(chips);
+
+//For how many frames the try again message is shown
+var messageTime = 7;
+
+//How many frames after the chip has landed before input is enabled
+var landingDelay = 7;
+
+//How many frames after the game ends before the result screen pops up
+var resultDelay = 20;
+
+//Message board container
+var messageContainer = new PIXI.Container();
+var sprMessage;
+Stage.addChild(messageContainer);
+
+//Input helper arrow and preview chip container
+var arrowContainer = new PIXI.Container();
+var rectArrow = new PIXI.Rectangle(0, InitFieldSize, InitFieldSize, InitFieldSize);
+var sprArrow;
+var sprShadow;
+Stage.addChild(arrowContainer);
 
 //Shortcuts
 var resources = PIXI.loader.resources;
 
-//Create canvas element, with dark background
+//Create canvas element, with dark background and append to div 'display'
 var renderer = PIXI.autoDetectRenderer(getCanvasWidth(), getCanvasHeight(), {
     antialias: false,
     transparent: false,
     resolution: 1
 });
 renderer.backgroundColor = 0x140C1C;
-
-//Append canvas element to div 'display'
 document.getElementById('display').appendChild(renderer.view);
-
-//Create container/root object
-var Stage = new PIXI.Container();
 
 //Resource aliases
 var FieldVac = "img/field.png";
@@ -257,68 +285,17 @@ var ChipBlu = "img/chip_blue.png";
 var ChipRed = "img/chip_red.png";
 var DropBlu = "img/chip_drop_blue.png";
 var DropRed = "img/chip_drop_red.png";
+var Arrow = "img/arrow.png";
 var ShadowBlu = "img/chip_shadow_blue.png";
 var ShadowRed = "img/chip_shadow_red.png";
+var MessageBoard = "img/message_board.png";
+var TryAgainBlu = "img/tryagain_blue.png";
+var TryAgainRed = "img/tryagain_red.png";
+var ResultBlu = "img/result_blue.png";
+var ResultRed = "img/result_red.png";
+var ResultTie = "img/result_tie.png";
 
-//Create chip container
-var chips = new PIXI.Container();
-Stage.addChild(chips);
-
-//Set sprites for falling and landing animation
-function chipToBoard(vx, vy) {
-    var sourceAnim,
-        sourceFinal,
-        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
-        texChip,
-        sprChip,
-        falling = true,
-        anim,
-        animLoopCounter = 0;
-    switch (PlayerTurn) {
-        case 1:
-            sourceAnim = DropBlu;
-            sourceFinal = ChipBlu;
-            break;
-        case 2:
-            sourceAnim = DropRed;
-            sourceFinal = ChipRed;
-            break;
-    }
-    
-    texChip = resources[sourceAnim].texture;
-    texChip.frame = rect;
-    sprChip = new PIXI.Sprite(texChip);
-    sprChip.x = InitFieldSize * vx;
-    sprChip.y = 0;
-    
-    anim = setInterval(function() {
-        if (animLoopCounter == vy && falling) {
-            rect.x = InitFieldSize;
-            rect.y = 0;
-            falling = false;
-        }
-        if (rect.y > InitFieldSize * 2) {
-            if (falling) {
-                rect.y = InitFieldSize;
-            } else {
-                sprChip.texture = resources[sourceFinal].texture;
-                rect.x = 0;
-                rect.y = 0;
-                clearInterval(anim);
-            }
-        }
-        sprChip.texture.frame = rect;
-        rect.y += InitFieldSize;
-        if (falling) {
-            animLoopCounter += .5;
-            sprChip.y = animLoopCounter * InitFieldSize;
-        }
-    }, animFrameLength);
-    
-    chips.addChild(sprChip);
-}
-
-//Load sprites for the board and chips, call setup function
+//Load sprites, call setup function
 PIXI.loader
     .add([
         FieldVac,
@@ -326,13 +303,20 @@ PIXI.loader
         ChipRed,
         DropBlu,
         DropRed,
+        Arrow,
         ShadowBlu,
-        ShadowRed
+        ShadowRed,
+        MessageBoard,
+        TryAgainBlu,
+        TryAgainRed,
+        ResultBlu,
+        ResultRed,
+        ResultTie
     ])
     .load(setup);
 
-//Setup function - add the board to the stage, create interactive slot containers, call feedback loop function
-function setup() {
+//Board setup - create the board and interactive slot containers
+function setupBoard() {
     var i,
         j,
         slot,
@@ -350,15 +334,200 @@ function setup() {
         Stage.addChild(slot);
         Stage.setChildIndex(slot, 0);
     }
+}
+
+//Messages setup - create message board for result and try again messages
+function setupMessages() {
+    var texBoard = resources[MessageBoard].texture,
+        texMessage = resources[TryAgainBlu].texture,
+        sprBoard = new PIXI.Sprite(texBoard);
+    sprMessage = new PIXI.Sprite(texMessage);
+    sprBoard.anchor.set(0.5, 0.5);
+    sprMessage.anchor.set(0.5, 0.5);
+    sprBoard.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    sprMessage.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    messageContainer.addChild(sprBoard);
+    messageContainer.addChild(sprMessage);
+    messageContainer.visible = false;
+}
+
+//Preview setup - create arrow to feedback input and shadow chip to clarify options
+function setupPreview() {
+    var texArrow = resources[Arrow].texture,
+        texShadow = resources[ShadowBlu].texture;
+    texArrow.frame = rectArrow;
+    sprArrow = new PIXI.Sprite(texArrow);
+    sprShadow = new PIXI.Sprite(texShadow);
+    sprShadow.y = (InitBoardHeight - 1) * InitFieldSize;
+    arrowContainer.addChild(sprArrow);
+    arrowContainer.addChild(sprShadow);
+}
+
+//Setup function - call setup and feedback loop functions
+function setup() {
+    setupBoard();
+    setupMessages();
+    setupPreview();
     
     feedbackLoop();
 }
 
-//Feedback function - render the stage
+//Feedback function - render the stage continuously
 function feedbackLoop() {
     requestAnimationFrame(feedbackLoop);
     
     renderer.render(Stage);
+}
+
+//Set sprites for falling and landing animation
+function chipToBoard(vx, vy) {
+    var sourceAnim,
+        sourceFinal,
+        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
+        texChip,
+        sprChip,
+        falling = true,
+        anim,
+        animLoopCounter = 0,
+        waiting = false,
+        waitCounter = 0;
+    switch (ArrayFieldValues[vx][vy]) {
+        case 1:
+            sourceAnim = DropBlu;
+            sourceFinal = ChipBlu;
+            break;
+        case 2:
+            sourceAnim = DropRed;
+            sourceFinal = ChipRed;
+            break;
+    }
+    
+    texChip = resources[sourceAnim].texture;
+    texChip.frame = rect;
+    sprChip = new PIXI.Sprite(texChip);
+    sprChip.x = InitFieldSize * vx;
+    sprChip.y = 0;
+    
+    anim = setInterval(function () {
+        if (waiting) {
+            waitCounter += 1;
+            if (waitCounter === landingDelay) {
+                clearInterval(anim);
+                if (!GameOver) {
+                    setPlayerInput(true);
+                }
+            }
+        } else {
+            if (animLoopCounter === vy && falling) {
+                rect.x = InitFieldSize;
+                rect.y = 0;
+                falling = false;
+            }
+            if (rect.y > InitFieldSize * 2) {
+                if (falling) {
+                    rect.y = InitFieldSize;
+                } else {
+                    sprChip.texture = resources[sourceFinal].texture;
+                    rect.x = 0;
+                    rect.y = 0;
+                    waiting = true;
+                }
+            }
+            sprChip.texture.frame = rect;
+            rect.y += InitFieldSize;
+            if (falling) {
+                animLoopCounter += 0.5;
+                sprChip.y = animLoopCounter * InitFieldSize;
+            }
+        }
+    }, animFrameLength);
+    
+    chips.addChild(sprChip);
+}
+
+//Render try again message for limited time
+function renderTryAgain() {
+    var texName,
+        showAndHide,
+        delayCounter = 0;
+    switch (PlayerTurn) {
+        case 1:
+            texName = TryAgainBlu;
+            break;
+        case 2:
+            texName = TryAgainRed;
+            break;
+    }
+    sprMessage.texture = resources[texName].texture;
+    messageContainer.visible = true;
+    
+    showAndHide = setInterval(function () {
+        if (delayCounter === messageTime) {
+            clearInterval(showAndHide);
+            messageContainer.visible = false;
+            setPlayerInput(true);
+        }
+        delayCounter += 1;
+    }, animFrameLength);
+}
+
+//Render result message
+function renderResultScreen(Result) {
+    var texName,
+        delay,
+        delayCounter = 0;
+    switch (Result) {
+        case 0:
+            texName = ResultTie;
+            break;
+        case 1:
+            texName = ResultBlu;
+            break;
+        case 2:
+            texName = ResultRed;
+            break;
+    }
+    sprMessage.texture = resources[texName].texture;
+    
+    delay = setInterval(function () {
+        if (delayCounter === resultDelay) {
+            clearInterval(delay);
+            messageContainer.visible = true;
+        }
+        delayCounter += 1;
+    }, animFrameLength)
+    
+}
+
+//Sets visibility of the arrow and shadow according to whether or not input is allowed
+function toggleRenderPreview() {
+    if(AllowInput) {
+        arrowContainer.visible = true;
+    } else {
+        arrowContainer.visible = false;
+    }
+    updateSelectionFeedback()
+}
+
+//Render the arrow and the chip preview
+function updateSelectionFeedback() {
+    var rectPosX,
+        shadowResource;
+    switch (PlayerTurn) {
+        case 1:
+            rectPosX = 0;
+            shadowResource = ShadowBlu;
+            break;
+        case 2:
+            rectPosX = InitFieldSize;
+            shadowResource = ShadowRed;
+            break;
+    }
+    rectArrow.x = rectPosX;
+    sprArrow.texture.frame = rectArrow;
+    sprShadow.texture = resources[shadowResource].texture;
+    arrowContainer.x = SelectionInput * InitFieldSize;
+    sprShadow.y = (ArraySlotVacancy[SelectionInput] - 1) * InitFieldSize;
 }
 
 
@@ -376,11 +545,12 @@ var AllowInput = true;
 //Disable player input while simulating, enable afterwards
 function setPlayerInput(playerInput) {
     AllowInput = playerInput;
+    toggleRenderPreview();
 }
 
 //Returns true if the mouse pointer is between the canvas' x and y values
 function isMouseInsideCanvas() {
-    if (0 < MousePos.x < getCanvasWidth() && 0 < MousePos.y < getCanvasHeight()) {
+    if (MousePos.x < getCanvasWidth() && MousePos.x > -1 && MousePos.y < getCanvasHeight() && MousePos.y > -1) {
         return true;
     } else {
         return false;
@@ -404,6 +574,8 @@ function mouseToSelection() {
 
 function onPoint() {
     SelectionInput = mouseToSelection();
+    updateSelectionFeedback(SelectionInput);
+    
 }
 
 function onClick() {
