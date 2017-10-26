@@ -1,7 +1,5 @@
 "use strict";
 
-/* L  O  G  I  C */
-
 /*====== Init variables - initially set ======*/
 
 //Amount of players participating
@@ -92,146 +90,6 @@ function isIndexValid(Index, Axis) {
     return isValid;
 }
 
-//Set the turn to the next player
-function nextPlayersTurn() {
-    var nextPlayer = PlayerTurn + 1;
-    if (nextPlayer > InitPlayers) {
-        nextPlayer = 1;
-    }
-    PlayerTurn = nextPlayer;
-}
-
-
-/*====== Functions ======*/
-
-//Called when the game is over, calls result screen according to result parameter
-function GameEnd(Result) {
-    GameOver = true;
-    renderResultScreen(Result);
-}
-
-//Execute when game ends in a tie
-function tieGame() {
-    console.log("Tie Game");
-    GameEnd(0);
-}
-
-//Execute when game is won
-function winGame() {
-    console.log("Player " + PlayerTurn + " won the game.");
-    GameEnd(PlayerTurn);
-}
-
-//If checkWin is false, check for vacant fields, return true if 0
-function checkTie() {
-    if (FieldsVacant < 1) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-//After player turns, check for win condition, return boolean
-function checkWin(vx, vy) {
-    var winCondFulfilled = false,
-        maxLength = InitWinCondition,
-        direction,
-        dx,
-        dy,
-        i,
-        counter,
-        positiveCount,
-        negativeCount,
-        checkX,
-        checkY;
-        
-    for (direction = 0; direction < 4; direction += 1) {
-        counter = 1;
-        positiveCount = true;
-        negativeCount = true;
-            
-        switch (direction) {
-            case 0:             //Horizontal
-                dx = 1;
-                dy = 0;
-                break;
-            case 1:             //Positive diagonal
-                dx = 1;
-                dy = 1;
-                break;
-            case 2:             //Negative diagonal
-                dx = 1;
-                dy = -1;
-                break;
-            case 3:             //Vertical
-                dx = 0;
-                dy = 1;
-                break;
-        }
-        
-        for (i = 1; i < maxLength; i += 1) {
-            if (positiveCount) {
-                checkX = vx + i * dx;
-                checkY = vy + i * dy;
-                if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
-                    counter += 1;
-                } else {
-                    positiveCount = false;
-                }
-            }
-            if (negativeCount) {
-                checkX = vx - i * dx;
-                checkY = vy - i * dy;
-                if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
-                    counter += 1;
-                } else {
-                    negativeCount = false;
-                }
-            }
-        }
-        
-        if (counter >= maxLength) {
-            winCondFulfilled = true;
-            break;
-        }
-    }
-    return winCondFulfilled;
-}
-
-//Drop a chip into given slot
-function dropChip(SlotIndex) {
-    ArraySlotVacancy[SlotIndex] -= 1;
-    var SlotField = ArraySlotVacancy[SlotIndex];
-    FieldsVacant -= 1;
-    ArrayFieldValues[SlotIndex][SlotField] = PlayerTurn;
-    //console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped at [x: " + SlotIndex + "; y: " + SlotField + "]");
-    if (!checkWin(SlotIndex, SlotField)) {
-        if (!checkTie()) {
-            nextPlayersTurn();
-        } else {
-            tieGame();
-        }
-    } else {
-        winGame();
-    }
-    chipToBoard(SlotIndex, SlotField);
-}
-
-//Trigger Try Again Message on attempting to drop a chip into an occupied slot
-function tryAgainMessage(SlotIndex) {
-    renderTryAgain();
-}
-
-//Try dropping a chip - trigger actual drop or try again
-function testSlotDrop(SlotIndex) {
-    setPlayerInput(false);
-    if (isSlotOccupied(SlotIndex)) {
-        tryAgainMessage(SlotIndex);
-    } else {
-        dropChip(SlotIndex);
-    }
-}
-
 
 
 /* G  R  A  P  H  I  C  S */
@@ -250,7 +108,7 @@ Stage.addChild(chips);
 var messageTime = 7;
 
 //How many frames after the chip has landed before input is enabled
-var landingDelay = 7;
+var impactDelay = 7;
 
 //How many frames after the game ends before the result screen pops up
 var resultDelay = 20;
@@ -317,6 +175,7 @@ PIXI.loader
 
 //Board setup - create the board and interactive slot containers
 function setupBoard() {
+    console.log("setupBoard");
     var i,
         j,
         slot,
@@ -338,6 +197,7 @@ function setupBoard() {
 
 //Messages setup - create message board for result and try again messages
 function setupMessages() {
+    console.log("setupMessages");
     var texBoard = resources[MessageBoard].texture,
         texMessage = resources[TryAgainBlu].texture,
         sprBoard = new PIXI.Sprite(texBoard);
@@ -353,6 +213,7 @@ function setupMessages() {
 
 //Preview setup - create arrow to feedback input and shadow chip to clarify options
 function setupPreview() {
+    console.log("setupPreview");
     var texArrow = resources[Arrow].texture,
         texShadow = resources[ShadowBlu].texture;
     texArrow.frame = rectArrow;
@@ -361,15 +222,7 @@ function setupPreview() {
     sprShadow.y = (InitBoardHeight - 1) * InitFieldSize;
     arrowContainer.addChild(sprArrow);
     arrowContainer.addChild(sprShadow);
-}
-
-//Setup function - call setup and feedback loop functions
-function setup() {
-    setupBoard();
-    setupMessages();
-    setupPreview();
-    
-    feedbackLoop();
+    arrowContainer.setChildIndex(sprShadow, 0);
 }
 
 //Feedback function - render the stage continuously
@@ -379,77 +232,22 @@ function feedbackLoop() {
     renderer.render(Stage);
 }
 
-//Set sprites for falling and landing animation
-function chipToBoard(vx, vy) {
-    var sourceAnim,
-        sourceFinal,
-        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
-        texChip,
-        sprChip,
-        falling = true,
-        anim,
-        animLoopCounter = 0,
-        waiting = false,
-        waitCounter = 0;
-    switch (ArrayFieldValues[vx][vy]) {
-        case 1:
-            sourceAnim = DropBlu;
-            sourceFinal = ChipBlu;
-            break;
-        case 2:
-            sourceAnim = DropRed;
-            sourceFinal = ChipRed;
-            break;
-    }
+//Setup function - call setup and feedback loop functions
+function setup() {
+    console.log("setup");
+    setupBoard();
+    setupMessages();
+    setupPreview();
     
-    texChip = resources[sourceAnim].texture;
-    texChip.frame = rect;
-    sprChip = new PIXI.Sprite(texChip);
-    sprChip.x = InitFieldSize * vx;
-    sprChip.y = 0;
-    
-    anim = setInterval(function () {
-        if (waiting) {
-            waitCounter += 1;
-            if (waitCounter === landingDelay) {
-                clearInterval(anim);
-                if (!GameOver) {
-                    setPlayerInput(true);
-                }
-            }
-        } else {
-            if (animLoopCounter === vy && falling) {
-                rect.x = InitFieldSize;
-                rect.y = 0;
-                falling = false;
-            }
-            if (rect.y > InitFieldSize * 2) {
-                if (falling) {
-                    rect.y = InitFieldSize;
-                } else {
-                    sprChip.texture = resources[sourceFinal].texture;
-                    rect.x = 0;
-                    rect.y = 0;
-                    waiting = true;
-                }
-            }
-            sprChip.texture.frame = rect;
-            rect.y += InitFieldSize;
-            if (falling) {
-                animLoopCounter += 0.5;
-                sprChip.y = animLoopCounter * InitFieldSize;
-            }
-        }
-    }, animFrameLength);
-    
-    chips.addChild(sprChip);
+    feedbackLoop();
 }
 
 //Render try again message for limited time
-function renderTryAgain() {
+function feedbackTryAgain() {
+    console.log("feedbackTryAgain");
     var texName,
         showAndHide,
-        delayCounter = 0;
+        showCounter = 0;
     switch (PlayerTurn) {
         case 1:
             texName = TryAgainBlu;
@@ -462,21 +260,23 @@ function renderTryAgain() {
     messageContainer.visible = true;
     
     showAndHide = setInterval(function () {
-        if (delayCounter === messageTime) {
+        if (showCounter === messageTime) {
             clearInterval(showAndHide);
             messageContainer.visible = false;
             setPlayerInput(true);
+            feedbackInputAllowed();
         }
-        delayCounter += 1;
+        showCounter += 1;
     }, animFrameLength);
 }
 
 //Render result message
-function renderResultScreen(Result) {
+function feedbackGameOver() {
+    console.log("feedbackGameOver");
     var texName,
-        delay,
+        delayTimer,
         delayCounter = 0;
-    switch (Result) {
+    switch (PlayerTurn) {
         case 0:
             texName = ResultTie;
             break;
@@ -489,28 +289,141 @@ function renderResultScreen(Result) {
     }
     sprMessage.texture = resources[texName].texture;
     
-    delay = setInterval(function () {
+    delayTimer = setInterval(function () {
         if (delayCounter === resultDelay) {
-            clearInterval(delay);
             messageContainer.visible = true;
+            clearInterval(delayTimer);
         }
         delayCounter += 1;
-    }, animFrameLength)
+    }, animFrameLength);
     
 }
 
-//Sets visibility of the arrow and shadow according to whether or not input is allowed
-function toggleRenderPreview() {
-    if(AllowInput) {
-        arrowContainer.visible = true;
-    } else {
-        arrowContainer.visible = false;
+//After a short impact delay, present winner chips or re-enable input
+function feedbackWin() {
+    console.log("feedbackWin");
+    var delayTimer,
+        delayCounter = 0;
+    delayTimer = setInterval(function () {
+        if (delayCounter < impactDelay) {
+            delayCounter += 1;
+        } else {
+            if (GameOver) {
+                //WINNING FEEDBACK BLING BLING
+                feedbackGameOver();
+            } else {
+                setPlayerInput(true);
+                feedbackInputAllowed();
+                clearInterval(delayTimer)
+            }
+        }
+    }, animFrameLength);
+}
+
+//The impact effect
+function feedbackImpact(sprChip, rect, chipColor) {
+    console.log("feedbackImpact");
+    var sourceFinal,
+        animImpact,
+        animLoopCounter = 0,
+        animCounterStop = 3;
+    switch (chipColor) {
+        case 1:
+            sourceFinal = ChipBlu;
+            break;
+        case 2:
+            sourceFinal = ChipRed;
+            break;
     }
-    updateSelectionFeedback()
+    rect.x = InitFieldSize;
+    rect.y = 0;
+    sprChip.texture.frame = rect;
+    animImpact = setInterval(function () {
+        animLoopCounter += 1;
+        if (animLoopCounter < animCounterStop) {
+            rect.y = animLoopCounter * InitFieldSize;
+            sprChip.texture.frame = rect;
+        } else {
+            sprChip.texture = resources[sourceFinal].texture;
+            rect.x = 0;
+            rect.y = 0;
+            feedbackWin();
+            clearInterval(animImpact);
+        }
+    }, animFrameLength);
+}
+
+//The falling animation
+function feedbackDrop(vx, vy) {
+    console.log("feedbackDrop");
+    var sourceAnim,
+        chipColor = ArrayFieldValues[vx][vy],
+        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
+        texChip,
+        sprChip,
+        firstLoop = true,
+        animDrop,
+        animLoopCounter = 0;
+    switch (chipColor) {
+        case 1:
+            sourceAnim = DropBlu;
+            break;
+        case 2:
+            sourceAnim = DropRed;
+            break;
+    }
+    texChip = resources[sourceAnim].texture;
+    texChip.frame = rect;
+    sprChip = new PIXI.Sprite(texChip);
+    sprChip.x = InitFieldSize * vx;
+    sprChip.y = 0;
+    animDrop = setInterval(function () {
+        if (firstLoop) {
+            firstLoop = false;
+        } else {
+            animLoopCounter += 0.5;
+        }
+        if (animLoopCounter < vy) {
+            if (rect.y === InitFieldSize * 2) {
+                rect.y = 0;
+            }
+            rect.y += InitFieldSize;
+        } else {
+            rect.x = InitFieldSize;
+            rect.y = 0;
+            console.log("impact");
+            feedbackImpact(sprChip, rect, chipColor);
+            clearInterval(animDrop);
+        }
+        sprChip.y = animLoopCounter * InitFieldSize;
+        sprChip.texture.frame = rect;
+    }, animFrameLength);
+    
+    chips.addChild(sprChip);
+}
+
+//Arrow responds to input
+function feedbackInput(vx, vy) {
+    console.log("feedbackInput");
+    var animInput,
+        animLoopCounter = 2,
+        animCounterStop = 4;
+    animInput = setInterval(function () {
+        if (animLoopCounter < animCounterStop) {
+            rectArrow.y = animLoopCounter * InitFieldSize;
+            sprArrow.texture.frame = rectArrow;
+            animLoopCounter += 1;
+        } else {
+            feedbackInputAllowed();
+            feedbackDrop(vx, vy);
+            clearInterval(animInput);
+        }
+    }, animFrameLength);
 }
 
 //Render the arrow and the chip preview
-function updateSelectionFeedback() {
+function feedbackSelection() {
+    console.log("feedbackSelection");
     var rectPosX,
         shadowResource;
     switch (PlayerTurn) {
@@ -524,10 +437,174 @@ function updateSelectionFeedback() {
             break;
     }
     rectArrow.x = rectPosX;
+    if (isSlotOccupied(SelectionInput)) {
+        rectArrow.y = 0;
+    } else {
+        rectArrow.y = InitFieldSize;
+    }
     sprArrow.texture.frame = rectArrow;
     sprShadow.texture = resources[shadowResource].texture;
     arrowContainer.x = SelectionInput * InitFieldSize;
     sprShadow.y = (ArraySlotVacancy[SelectionInput] - 1) * InitFieldSize;
+}
+
+//Sets visibility of the arrow and shadow according to whether or not input is allowed
+function feedbackInputAllowed() {
+    console.log("feedbackInputAllowed");
+    if (AllowInput) {
+        feedbackSelection();
+        arrowContainer.visible = true;
+    } else {
+        arrowContainer.visible = false;
+    }
+}
+
+
+
+/* L  O  G  I  C */
+
+//Called when the game is over, calls result screen according to result parameter
+function GameEnd() {
+    console.log("GameEnd");
+    GameOver = true;
+    //feedbackGameOver();
+}
+
+//Execute when game ends in a tie
+function tieGame() {
+    console.log("tieGame");
+    PlayerTurn = 0;
+    GameEnd();
+}
+
+//Execute when game is won
+function winGame() {
+    console.log("winGame");
+    GameEnd();
+}
+
+//If checkWin is false, check for vacant fields, return true if 0
+function checkTie() {
+    console.log("checkTie");
+    if (FieldsVacant < 1) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+//After player turns, check for win condition, return boolean
+function checkWin(vx, vy) {
+    console.log("checkWin -> " + vx + ", " + vy);
+    var winCondFulfilled = false,
+        maxLength = InitWinCondition,
+        direction,
+        dx,
+        dy,
+        i,
+        counter,
+        positiveCount,
+        negativeCount,
+        checkX,
+        checkY;
+        
+    for (direction = 0; direction < 4; direction += 1) {
+        counter = 1;
+        positiveCount = true;
+        negativeCount = true;
+            
+        switch (direction) {
+            case 0:             //Horizontal
+                dx = 1;
+                dy = 0;
+                break;
+            case 1:             //Positive diagonal
+                dx = 1;
+                dy = 1;
+                break;
+            case 2:             //Negative diagonal
+                dx = 1;
+                dy = -1;
+                break;
+            case 3:             //Vertical
+                dx = 0;
+                dy = 1;
+                break;
+        }
+        
+        for (i = 1; i < maxLength; i += 1) {
+            if (positiveCount) {
+                checkX = vx + i * dx;
+                checkY = vy + i * dy;
+                if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
+                    counter += 1;
+                } else {
+                    positiveCount = false;
+                }
+            }
+            if (negativeCount) {
+                checkX = vx - i * dx;
+                checkY = vy - i * dy;
+                if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
+                    counter += 1;
+                } else {
+                    negativeCount = false;
+                }
+            }
+        }
+        
+        if (counter >= maxLength) {
+            winCondFulfilled = true;
+            break;
+        }
+    }
+    return winCondFulfilled;
+}
+
+//Set the turn to the next player
+function nextPlayersTurn() {
+    console.log("nextPlayersTurn");
+    var nextPlayer = PlayerTurn + 1;
+    if (nextPlayer > InitPlayers) {
+        nextPlayer = 1;
+    }
+    PlayerTurn = nextPlayer;
+}
+
+//Trigger Try Again Message on attempting to drop a chip into an occupied slot
+function invalidInput() {
+    console.log("invalidInput");
+    feedbackTryAgain();
+}
+
+//Drop a chip into given slot
+function validInput(SlotIndex) {
+    console.log("validInput -> " + SlotIndex);
+    ArraySlotVacancy[SlotIndex] -= 1;
+    var SlotField = ArraySlotVacancy[SlotIndex];
+    FieldsVacant -= 1;
+    ArrayFieldValues[SlotIndex][SlotField] = PlayerTurn;
+    //console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped at [x: " + SlotIndex + "; y: " + SlotField + "]");
+    if (!checkWin(SlotIndex, SlotField)) {
+        if (!checkTie()) {
+            nextPlayersTurn();
+        } else {
+            tieGame();
+        }
+    } else {
+        winGame();
+    }
+    feedbackInput(SlotIndex, SlotField);
+}
+
+//Try dropping a chip - trigger actual drop or try again
+function branchInputValid(SlotIndex) {
+    console.log("branchInputValid -> " + SlotIndex);
+    if (isSlotOccupied(SlotIndex)) {
+        invalidInput();
+    } else {
+        validInput(SlotIndex);
+    }
 }
 
 
@@ -536,7 +613,10 @@ function updateSelectionFeedback() {
 
 /*====== Mouse ======*/
 
+//The position of the mouse inside of the canvas
 var MousePos = renderer.plugins.interaction.mouse.global;
+
+//The currently selected slot
 var SelectionInput = 0;
 
 //Whether or not the player can create input - disable while simulating
@@ -545,7 +625,15 @@ var AllowInput = true;
 //Disable player input while simulating, enable afterwards
 function setPlayerInput(playerInput) {
     AllowInput = playerInput;
-    toggleRenderPreview();
+    //feedbackInputAllowed();
+}
+
+//Called when Enter is pressed or the mouse clicked
+function hardInput() {
+    if (AllowInput) {
+        setPlayerInput(false);
+        branchInputValid(SelectionInput);
+    }
 }
 
 //Returns true if the mouse pointer is between the canvas' x and y values
@@ -557,6 +645,26 @@ function isMouseInsideCanvas() {
     }
 }
 
+//Return index of the slot by given mouse position while IsMouseInsideCanvas equals true
+function mouseToSelection() {
+    if (isMouseInsideCanvas()) {
+        return Math.floor(MousePos.x / InitFieldSize);
+    }
+}
+
+//When mouse (or other pointer) hovers over a slot
+function onPoint() {
+    SelectionInput = mouseToSelection();
+    if (AllowInput) {
+        feedbackSelection();
+    }
+}
+
+//When a slot is clicked (or tapped)
+function onClick() {
+    hardInput();
+}
+
 //Enable interactivity for mouse/touch
 function clickable(dispObj) {
     dispObj.interactive = true;
@@ -565,29 +673,36 @@ function clickable(dispObj) {
     dispObj.on('pointerdown', onClick);
 }
 
-//Return index of the slot by given mouse position while IsMouseInsideCanvas equals true
-function mouseToSelection() {
-    if (isMouseInsideCanvas()) {
-        return Math.floor(MousePos.x / InitFieldSize);
-    }
-}
-
-function onPoint() {
-    SelectionInput = mouseToSelection();
-    updateSelectionFeedback(SelectionInput);
-    
-}
-
-function onClick() {
-    if (AllowInput) {
-        testSlotDrop(SelectionInput);
-    }
-}
-
 
 /*====== Keyboard ======*/
 
-/*
+//Left key is pressed
+function selectionToLeft() {
+    var newInput = SelectionInput;
+    if (!isMouseInsideCanvas()) {
+        if (newInput === 0) {
+            newInput = InitBoardWidth;
+        }
+        newInput -= 1;
+        SelectionInput = newInput;
+        feedbackSelection();
+    }
+}
+
+//Right key is pressed
+function selectionToRight() {
+    var newInput = SelectionInput;
+    if (!isMouseInsideCanvas()) {
+        newInput += 1;
+        if (newInput === InitBoardWidth) {
+            newInput = 0;
+        }
+        SelectionInput = newInput;
+        feedbackSelection();
+    }
+}
+
+//General keyboard setup
 function keyboard(keyCode) {
     var key  = {};
     key.code = keyCode;
@@ -604,7 +719,7 @@ function keyboard(keyCode) {
             key.isDown = true;
             key.isUp = false;
         }
-        event.preventDefault();
+        //event.preventDefault();
     };
     
     key.upHandler = function(event) {
@@ -615,7 +730,7 @@ function keyboard(keyCode) {
             key.isDown = false;
             key.isUp = true;
         }
-        event.preventDefault();
+        //event.preventDefault();
     };
     
     window.addEventListener(
@@ -629,13 +744,20 @@ function keyboard(keyCode) {
     return key;
 }
 
+//Left arrow key event
 var keyLeft = keyboard(37);
-var keyRight = keyboard(39);
-
 keyLeft.press = function() {
-    
+    selectionToLeft();
 };
 
+//Right arrow key event
+var keyRight = keyboard(39);
 keyRight.press = function() {
-    
-}; */
+    selectionToRight();
+};
+
+//Enter key event
+var keyEnter = keyboard(13);
+keyEnter.press = function() {
+    hardInput();
+}
