@@ -39,22 +39,41 @@ function getFieldAmount() {
 /*====== In game variables - changing in game ======*/
 
 //Values for board fields; 0 = vacant, 1 = P1, 2 = P2, ...
-var ArrayFieldValues = [],
-    i,
-    j;
-for (i = 0; i < InitBoardWidth; i += 1) {
-    ArrayFieldValues[i] = [];
-    for (j = 0; j < InitBoardHeight; j += 1) {
-        ArrayFieldValues[i][j] = 0;
+var ArrayFieldValues = [];
+function fillArrayFieldValues() {
+    var i,
+        j;
+    for (i = 0; i < InitBoardWidth; i += 1) {
+        ArrayFieldValues[i] = [];
+        for (j = 0; j < InitBoardHeight; j += 1) {
+            ArrayFieldValues[i][j] = 0;
+        }
     }
 }
+fillArrayFieldValues();
 
 //Amount of free fields per slot; 0 = no free field
-var ArraySlotVacancy = [],
-    i;
-for (i = 0; i < InitBoardWidth; i += 1) {
-    ArraySlotVacancy[i] = InitBoardHeight;
+var ArraySlotVacancy = [];
+function fillArraySlotVacancy() {
+    var i;
+    for (i = 0; i < InitBoardWidth; i += 1) {
+        ArraySlotVacancy[i] = InitBoardHeight;
+    }
 }
+fillArraySlotVacancy();
+
+//Array for position of winning chips
+var ArrayWinX = [],
+    ArrayWinY = [],
+    maxChipRow = (2 * InitWinCondition) - 1;
+function fillArrayWin() {
+    var i;
+    for (i = 0; i < maxChipRow; i += 1) {
+        ArrayWinX[i] = -1;
+        ArrayWinY[i] = -1;
+    }
+}
+fillArrayWin();
 
 //ID of the player who currently takes turn; 1 = P1, 2 = P2, ...
 var PlayerTurn = 1;
@@ -79,12 +98,12 @@ function isIndexValid(Index, Axis) {
     var comp,
         isValid;
     switch (Axis) {
-        case 'x':
-            comp = InitBoardWidth;
-            break;
-        case 'y':
-            comp = InitBoardHeight;
-            break;
+    case 'x':
+        comp = InitBoardWidth;
+        break;
+    case 'y':
+        comp = InitBoardHeight;
+        break;
     }
     isValid = (Index > -1 && Index < comp) ? true : false;
     return isValid;
@@ -141,14 +160,18 @@ document.getElementById('display').appendChild(renderer.view);
 var FieldVac = "img/field.png";
 var ChipBlu = "img/chip_blue.png";
 var ChipRed = "img/chip_red.png";
-var DropBlu = "img/chip_drop_blue.png";
-var DropRed = "img/chip_drop_red.png";
+var DropBlu = "img/chip_blue_drop.png";
+var DropRed = "img/chip_red_drop.png";
 var Arrow = "img/arrow.png";
-var ShadowBlu = "img/chip_shadow_blue.png";
-var ShadowRed = "img/chip_shadow_red.png";
+var ShadowBlu = "img/chip_blue_shadow.png";
+var ShadowRed = "img/chip_red_shadow.png";
 var MessageBoard = "img/message_board.png";
 var TryAgainBlu = "img/tryagain_blue.png";
 var TryAgainRed = "img/tryagain_red.png";
+var WinBlu = "img/chip_blue_win.png";
+var WinRed = "img/chip_red_win.png";
+var RocketBlu = "img/rocket_blue.png";
+var RocketRed = "img/rocket_red.png";
 var ResultBlu = "img/result_blue.png";
 var ResultRed = "img/result_red.png";
 var ResultTie = "img/result_tie.png";
@@ -167,6 +190,10 @@ PIXI.loader
         MessageBoard,
         TryAgainBlu,
         TryAgainRed,
+        WinBlu,
+        WinRed,
+        RocketBlu,
+        RocketRed,
         ResultBlu,
         ResultRed,
         ResultTie
@@ -249,12 +276,12 @@ function feedbackTryAgain() {
         showAndHide,
         showCounter = 0;
     switch (PlayerTurn) {
-        case 1:
-            texName = TryAgainBlu;
-            break;
-        case 2:
-            texName = TryAgainRed;
-            break;
+    case 1:
+        texName = TryAgainBlu;
+        break;
+    case 2:
+        texName = TryAgainRed;
+        break;
     }
     sprMessage.texture = resources[texName].texture;
     messageContainer.visible = true;
@@ -273,67 +300,140 @@ function feedbackTryAgain() {
 //Render result message
 function feedbackGameOver() {
     console.log("feedbackGameOver");
-    var texName,
-        delayTimer,
-        delayCounter = 0;
+    var texNameMessage,
+        texNameRocket,
+        texSizeRocket = InitFieldSize * 2,
+        rect = new PIXI.Rectangle(0, 0, texSizeRocket, texSizeRocket),
+        texWinner,
+        sprWinner,
+        rockets = true,
+        animFrameCount = 8,
+        animWinner,
+        animDelayCounter = 0,
+        animLoopCounter = 0;
     switch (PlayerTurn) {
-        case 0:
-            texName = ResultTie;
-            break;
-        case 1:
-            texName = ResultBlu;
-            break;
-        case 2:
-            texName = ResultRed;
-            break;
+    case 0:
+        texNameMessage = ResultTie;
+        rockets = false;
+        break;
+    case 1:
+        //texNameMessage = ResultBlu;
+        texNameRocket = RocketBlu;
+        break;
+    case 2:
+        //texNameMessage = ResultRed;
+        texNameRocket = RocketRed;
+        break;
     }
-    sprMessage.texture = resources[texName].texture;
-    
-    delayTimer = setInterval(function () {
-        if (delayCounter === resultDelay) {
-            messageContainer.visible = true;
-            clearInterval(delayTimer);
+    //sprMessage.texture = resources[texNameMessage].texture;
+    texWinner = resources[texNameRocket].texture;
+    sprWinner = new PIXI.Sprite(texWinner);
+    sprWinner.texture.frame = rect;
+    animWinner = setInterval(function () {
+        if (animDelayCounter < resultDelay) {
+            animDelayCounter += 1;
+        } else {
+            if (rockets) {
+                if (Math.floor(animLoopCounter % animFrameCount) === 0) {
+                    rect.x = 0;
+                    sprWinner.x = Math.floor(Math.random() * (InitBoardWidth - 1)) * InitFieldSize;
+                    sprWinner.y = Math.floor(Math.random() * (InitBoardHeight - 1)) * InitFieldSize;
+                } else if (animLoopCounter % (animFrameCount * 0.5) === 0) {
+                    rect.x = texSizeRocket;
+                }
+                rect.y = (animLoopCounter % (animFrameCount * 0.5)) * texSizeRocket;
+                sprWinner.texture.frame = rect;
+                animLoopCounter += 1;
+            } else {
+                messageContainer.visible = true;
+                clearInterval(animWinner);
+            }
         }
-        delayCounter += 1;
     }, animFrameLength);
     
+    if (rockets) {
+        Stage.addChild(sprWinner);
+    }
 }
 
 //After a short impact delay, present winner chips or re-enable input
-function feedbackWin() {
+function feedbackWin(chipColor) {
     console.log("feedbackWin");
-    var delayTimer,
-        delayCounter = 0;
-    delayTimer = setInterval(function () {
+    var texName,
+        texEffect,
+        sprEffect,
+        rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
+        animWin,
+        delayCounter = 0,
+        animLoopCounter = 0,
+        animFrameCount = 6,
+        animRunCount,
+        animCounterStop = animFrameCount * maxChipRow;
+    switch (chipColor) {
+    case 1:
+        texName = WinBlu;
+        break;
+    case 2:
+        texName = WinRed;
+        break;
+    }
+    texEffect = resources[texName].texture;
+    sprEffect = new PIXI.Sprite(texEffect);
+    sprEffect.texture.frame = rect;
+    sprEffect.visible = false;
+    animWin = setInterval(function () {
         if (delayCounter < impactDelay) {
             delayCounter += 1;
         } else {
             if (GameOver) {
-                //WINNING FEEDBACK BLING BLING
-                feedbackGameOver();
+                if (animLoopCounter < animCounterStop) {
+                    rect.y = (animLoopCounter % animFrameCount) * InitFieldSize;
+                    sprEffect.texture.frame = rect;
+                    animRunCount = Math.floor(animLoopCounter / animFrameCount);
+                    if (animLoopCounter % animFrameCount === 0) {
+                        sprEffect.x = ArrayWinX[animRunCount] * InitFieldSize;
+                        sprEffect.y = ArrayWinY[animRunCount] * InitFieldSize;
+                        sprEffect.visible = true;
+                    }
+                    if (ArrayWinX[animRunCount] === -1) {
+                        animLoopCounter += animFrameCount;
+                    } else {
+                        animLoopCounter += 1;
+                    }
+                    //console.log(animRunCount + "; " + rect.y + "; " + ArrayWinX[animRunCount] + "; " + ArrayWinY[animRunCount]);
+                } else {
+                    sprEffect.visible = false;
+                    feedbackGameOver();
+                    clearInterval(animWin);
+                }
             } else {
                 setPlayerInput(true);
                 feedbackInputAllowed();
-                clearInterval(delayTimer)
+                clearInterval(animWin);
             }
         }
     }, animFrameLength);
+    
+    if (GameOver) {
+        console.log("win");
+        chips.addChild(sprEffect);
+    }
 }
 
 //The impact effect
 function feedbackImpact(sprChip, rect, chipColor) {
     console.log("feedbackImpact");
-    var sourceFinal,
+    var texName,
         animImpact,
         animLoopCounter = 0,
         animCounterStop = 3;
     switch (chipColor) {
-        case 1:
-            sourceFinal = ChipBlu;
-            break;
-        case 2:
-            sourceFinal = ChipRed;
-            break;
+    case 1:
+        texName = ChipBlu;
+        break;
+    case 2:
+        texName = ChipRed;
+        break;
     }
     rect.x = InitFieldSize;
     rect.y = 0;
@@ -344,10 +444,10 @@ function feedbackImpact(sprChip, rect, chipColor) {
             rect.y = animLoopCounter * InitFieldSize;
             sprChip.texture.frame = rect;
         } else {
-            sprChip.texture = resources[sourceFinal].texture;
+            sprChip.texture = resources[texName].texture;
             rect.x = 0;
             rect.y = 0;
-            feedbackWin();
+            feedbackWin(chipColor);
             clearInterval(animImpact);
         }
     }, animFrameLength);
@@ -356,7 +456,7 @@ function feedbackImpact(sprChip, rect, chipColor) {
 //The falling animation
 function feedbackDrop(vx, vy) {
     console.log("feedbackDrop");
-    var sourceAnim,
+    var texName,
         chipColor = ArrayFieldValues[vx][vy],
         rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
         texChip,
@@ -365,16 +465,16 @@ function feedbackDrop(vx, vy) {
         animDrop,
         animLoopCounter = 0;
     switch (chipColor) {
-        case 1:
-            sourceAnim = DropBlu;
-            break;
-        case 2:
-            sourceAnim = DropRed;
-            break;
+    case 1:
+        texName = DropBlu;
+        break;
+    case 2:
+        texName = DropRed;
+        break;
     }
-    texChip = resources[sourceAnim].texture;
-    texChip.frame = rect;
+    texChip = resources[texName].texture;
     sprChip = new PIXI.Sprite(texChip);
+    sprChip.texture.frame = rect;
     sprChip.x = InitFieldSize * vx;
     sprChip.y = 0;
     animDrop = setInterval(function () {
@@ -425,16 +525,16 @@ function feedbackInput(vx, vy) {
 function feedbackSelection() {
     console.log("feedbackSelection");
     var rectPosX,
-        shadowResource;
+        texName;
     switch (PlayerTurn) {
-        case 1:
-            rectPosX = 0;
-            shadowResource = ShadowBlu;
-            break;
-        case 2:
-            rectPosX = InitFieldSize;
-            shadowResource = ShadowRed;
-            break;
+    case 1:
+        rectPosX = 0;
+        texName = ShadowBlu;
+        break;
+    case 2:
+        rectPosX = InitFieldSize;
+        texName = ShadowRed;
+        break;
     }
     rectArrow.x = rectPosX;
     if (isSlotOccupied(SelectionInput)) {
@@ -443,7 +543,7 @@ function feedbackSelection() {
         rectArrow.y = InitFieldSize;
     }
     sprArrow.texture.frame = rectArrow;
-    sprShadow.texture = resources[shadowResource].texture;
+    sprShadow.texture = resources[texName].texture;
     arrowContainer.x = SelectionInput * InitFieldSize;
     sprShadow.y = (ArraySlotVacancy[SelectionInput] - 1) * InitFieldSize;
 }
@@ -463,24 +563,17 @@ function feedbackInputAllowed() {
 
 /* L  O  G  I  C */
 
-//Called when the game is over, calls result screen according to result parameter
-function GameEnd() {
-    console.log("GameEnd");
-    GameOver = true;
-    //feedbackGameOver();
-}
-
 //Execute when game ends in a tie
 function tieGame() {
     console.log("tieGame");
     PlayerTurn = 0;
-    GameEnd();
+    GameOver = true;
 }
 
 //Execute when game is won
 function winGame() {
     console.log("winGame");
-    GameEnd();
+    GameOver = true;
 }
 
 //If checkWin is false, check for vacant fields, return true if 0
@@ -493,7 +586,7 @@ function checkTie() {
     }
 }
 
-//After player turns, check for win condition, return boolean
+//After player turns, check for win condition and fill winner chip array, return boolean
 function checkWin(vx, vy) {
     console.log("checkWin -> " + vx + ", " + vy);
     var winCondFulfilled = false,
@@ -506,7 +599,10 @@ function checkWin(vx, vy) {
         positiveCount,
         negativeCount,
         checkX,
-        checkY;
+        checkY,
+        arrayStart = maxLength - 1;
+    ArrayWinX[arrayStart] = vx;
+    ArrayWinY[arrayStart] = vy;
         
     for (direction = 0; direction < 4; direction += 1) {
         counter = 1;
@@ -514,22 +610,22 @@ function checkWin(vx, vy) {
         negativeCount = true;
             
         switch (direction) {
-            case 0:             //Horizontal
-                dx = 1;
-                dy = 0;
-                break;
-            case 1:             //Positive diagonal
-                dx = 1;
-                dy = 1;
-                break;
-            case 2:             //Negative diagonal
-                dx = 1;
-                dy = -1;
-                break;
-            case 3:             //Vertical
-                dx = 0;
-                dy = 1;
-                break;
+        case 0:             //Horizontal
+            dx = 1;
+            dy = 0;
+            break;
+        case 1:             //Positive diagonal
+            dx = 1;
+            dy = 1;
+            break;
+        case 2:             //Negative diagonal
+            dx = 1;
+            dy = -1;
+            break;
+        case 3:             //Vertical
+            dx = 0;
+            dy = 1;
+            break;
         }
         
         for (i = 1; i < maxLength; i += 1) {
@@ -538,6 +634,8 @@ function checkWin(vx, vy) {
                 checkY = vy + i * dy;
                 if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
                     counter += 1;
+                    ArrayWinX[arrayStart + i] = checkX;
+                    ArrayWinY[arrayStart + i] = checkY;
                 } else {
                     positiveCount = false;
                 }
@@ -547,6 +645,8 @@ function checkWin(vx, vy) {
                 checkY = vy - i * dy;
                 if (isIndexValid(checkX, 'x') && isIndexValid(checkY, 'y') && ArrayFieldValues[checkX][checkY] === PlayerTurn) {
                     counter += 1;
+                    ArrayWinX[arrayStart - i] = checkX;
+                    ArrayWinY[arrayStart - i] = checkY;
                 } else {
                     negativeCount = false;
                 }
@@ -557,6 +657,9 @@ function checkWin(vx, vy) {
             winCondFulfilled = true;
             break;
         }
+    }
+    if (!winCondFulfilled) {
+        fillArrayWin();
     }
     return winCondFulfilled;
 }
@@ -711,7 +814,7 @@ function keyboard(keyCode) {
     key.press = undefined;
     key.release = undefined;
     
-    key.downHandler = function(event) {
+    key.downHandler = function (event) {
         if (event.keyCode === key.code) {
             if (key.isUp && key.press) {
                 key.press();
@@ -722,7 +825,7 @@ function keyboard(keyCode) {
         //event.preventDefault();
     };
     
-    key.upHandler = function(event) {
+    key.upHandler = function (event) {
         if (event.keyCode === key.code) {
             if (key.isDown && key.release) {
                 key.release();
@@ -734,11 +837,15 @@ function keyboard(keyCode) {
     };
     
     window.addEventListener(
-        "keydown", key.downHandler.bind(key), false
+        "keydown",
+        key.downHandler.bind(key),
+        false
     );
     
     window.addEventListener(
-        "keyup", key.upHandler.bind(key), false
+        "keyup",
+        key.upHandler.bind(key),
+        false
     );
     
     return key;
@@ -746,18 +853,18 @@ function keyboard(keyCode) {
 
 //Left arrow key event
 var keyLeft = keyboard(37);
-keyLeft.press = function() {
+keyLeft.press = function () {
     selectionToLeft();
 };
 
 //Right arrow key event
 var keyRight = keyboard(39);
-keyRight.press = function() {
+keyRight.press = function () {
     selectionToRight();
 };
 
 //Enter key event
 var keyEnter = keyboard(13);
-keyEnter.press = function() {
+keyEnter.press = function () {
     hardInput();
-}
+};
