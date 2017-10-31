@@ -130,7 +130,7 @@ var messageTime = 7;
 var impactDelay = 7;
 
 //How many frames after the game ends before the result screen pops up
-var resultDelay = 20;
+var resultDelay = 15;
 
 //Message board container
 var messageContainer = new PIXI.Container();
@@ -304,11 +304,14 @@ function feedbackGameOver() {
         texNameRocket,
         texSizeRocket = InitFieldSize * 2,
         rect = new PIXI.Rectangle(0, 0, texSizeRocket, texSizeRocket),
-        texWinner,
-        sprWinner,
+        texRocket,
+        sprRocket,
+        rocketDest,
+        rocketSpeed = 0.5,
         rockets = true,
+        traveling = false,
         animFrameCount = 8,
-        animWinner,
+        animRocket,
         animDelayCounter = 0,
         animLoopCounter = 0;
     switch (PlayerTurn) {
@@ -326,33 +329,49 @@ function feedbackGameOver() {
         break;
     }
     //sprMessage.texture = resources[texNameMessage].texture;
-    texWinner = resources[texNameRocket].texture;
-    sprWinner = new PIXI.Sprite(texWinner);
-    sprWinner.texture.frame = rect;
-    animWinner = setInterval(function () {
+    texRocket = resources[texNameRocket].texture;
+    sprRocket = new PIXI.Sprite(texRocket);
+    sprRocket.texture.frame = rect;
+    sprRocket.y = InitBoardHeight * InitFieldSize;
+    animRocket = setInterval(function () {
         if (animDelayCounter < resultDelay) {
             animDelayCounter += 1;
         } else {
             if (rockets) {
-                if (Math.floor(animLoopCounter % animFrameCount) === 0) {
+                if (animLoopCounter % animFrameCount === 0) {
                     rect.x = 0;
-                    sprWinner.x = Math.floor(Math.random() * (InitBoardWidth - 1)) * InitFieldSize;
-                    sprWinner.y = Math.floor(Math.random() * (InitBoardHeight - 1)) * InitFieldSize;
+                    sprRocket.x = Math.floor(Math.random() * (InitBoardWidth - 1)) * InitFieldSize;
+                    rocketDest = Math.floor(Math.random() * (InitBoardHeight - 1)) + 2;
+                    sprRocket.y = InitBoardHeight * InitFieldSize;
+                } else if (animLoopCounter % animFrameCount === 1) {
+                    traveling = true;
+                    rocketDest -= rocketSpeed;
+                    sprRocket.y -= rocketSpeed * InitFieldSize;
+                    if (rect.y === 0) {
+                        rect.y = texSizeRocket;
+                    } else {
+                        rect.y = 0;
+                    }
+                    if (rocketDest === 0) {
+                        traveling = false;
+                    }
                 } else if (animLoopCounter % (animFrameCount * 0.5) === 0) {
                     rect.x = texSizeRocket;
                 }
-                rect.y = (animLoopCounter % (animFrameCount * 0.5)) * texSizeRocket;
-                sprWinner.texture.frame = rect;
-                animLoopCounter += 1;
+                if (!traveling) {
+                    rect.y = (animLoopCounter % (animFrameCount * 0.5)) * texSizeRocket;
+                    animLoopCounter += 1;
+                }
+                sprRocket.texture.frame = rect;
             } else {
                 messageContainer.visible = true;
-                clearInterval(animWinner);
+                clearInterval(animRocket);
             }
         }
     }, animFrameLength);
     
     if (rockets) {
-        Stage.addChild(sprWinner);
+        Stage.addChild(sprRocket);
     }
 }
 
