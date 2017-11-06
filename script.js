@@ -50,7 +50,6 @@ function fillArrayFieldValues() {
         }
     }
 }
-fillArrayFieldValues();
 
 //Amount of free fields per slot; 0 = no free field
 var ArraySlotVacancy = [];
@@ -60,7 +59,6 @@ function fillArraySlotVacancy() {
         ArraySlotVacancy[i] = InitBoardHeight;
     }
 }
-fillArraySlotVacancy();
 
 //Array for position of winning chips
 var ArrayWinX = [],
@@ -73,16 +71,25 @@ function fillArrayWin() {
         ArrayWinY[i] = -1;
     }
 }
-fillArrayWin();
 
 //ID of the player who currently takes turn; 1 = P1, 2 = P2, ...
-var PlayerTurn = 1;
+var PlayerTurn;
 
 //Empty fields left
-var FieldsVacant = getFieldAmount();
+var FieldsVacant;
 
 //Set to true when game is over
-var GameOver = false;
+var GameOver;
+
+//Sets background logic to start conditions
+function setInitLogic() {
+    fillArrayFieldValues();
+    fillArraySlotVacancy();
+    fillArrayWin();
+    PlayerTurn = 1;
+    FieldsVacant = getFieldAmount();
+    GameOver = false;
+}
 
 //Return true if slot of given index has no vacant field
 function isSlotOccupied(SlotIndex) {
@@ -116,13 +123,6 @@ function isIndexValid(Index, Axis) {
 //Duration of one frame in milliseconds
 var animFrameLength = 60;
 
-//Root container object
-var Stage = new PIXI.Container();
-
-//Chip container
-var chips = new PIXI.Container();
-Stage.addChild(chips);
-
 //For how many frames the try again message is shown
 var messageTime = 7;
 
@@ -132,31 +132,10 @@ var impactDelay = 7;
 //How many frames after the game ends before the result screen pops up
 var resultDelay = 15;
 
-//Message board container
-var messageContainer = new PIXI.Container();
-var sprMessage;
-Stage.addChild(messageContainer);
-
-//Input helper arrow and preview chip container
-var arrowContainer = new PIXI.Container();
-var rectArrow = new PIXI.Rectangle(0, InitFieldSize, InitFieldSize, InitFieldSize);
-var sprArrow;
-var sprShadow;
-Stage.addChild(arrowContainer);
-
-//Shortcuts
+//Shortcuts & aliases
 var resources = PIXI.loader.resources;
+var Div = document.getElementById('display');
 
-//Create canvas element, with dark background and append to div 'display'
-var renderer = PIXI.autoDetectRenderer(getCanvasWidth(), getCanvasHeight(), {
-    antialias: false,
-    transparent: false,
-    resolution: 1
-});
-renderer.backgroundColor = 0x140C1C;
-document.getElementById('display').appendChild(renderer.view);
-
-//Resource aliases
 var FieldVac = "img/field.png";
 var ChipBlu = "img/chip_blue.png";
 var ChipRed = "img/chip_red.png";
@@ -175,6 +154,127 @@ var RocketRed = "img/rocket_red.png";
 var ResultBlu = "img/result_blue.png";
 var ResultRed = "img/result_red.png";
 var ResultTie = "img/result_tie.png";
+
+//Root container object
+var Stage;
+
+//Chip container
+var chipContainer;
+
+//Message board container
+var sprMessage;
+var messageContainer;
+
+//Input helper arrow and preview chip container
+var sprArrow;
+var sprShadow;
+var rectArrow;
+var arrowContainer;
+
+//Renderer / canvas element
+var renderer;
+
+//Canvas setup - create canvas element with dark background, append it to div and create mouse position variable relative to it
+function setupCanvas() {
+    console.log("setupCanvas");
+    renderer = PIXI.autoDetectRenderer(getCanvasWidth(), getCanvasHeight(), {
+        antialias: false,
+        transparent: false,
+        resolution: 1
+    });
+    renderer.backgroundColor = 0x140C1C;
+    Div.appendChild(renderer.view);
+}
+
+//Board setup - create the board and interactive slot containers
+function setupBoard() {
+    console.log("setupBoard");
+    var i,
+        j,
+        slot,
+        texField = resources[FieldVac].texture,
+        sprField;
+    for (i = 0; i < InitBoardWidth; i += 1) {
+        slot = new PIXI.Container();
+        clickable(slot);
+        for (j = 0; j < InitBoardHeight; j += 1) {
+            sprField = new PIXI.Sprite(texField);
+            sprField.x = InitFieldSize * i;
+            sprField.y = InitFieldSize * j;
+            slot.addChild(sprField);
+        }
+        Stage.addChild(slot);
+        Stage.setChildIndex(slot, 0);
+    }
+    chipContainer = new PIXI.Container();
+    Stage.addChild(chipContainer);
+}
+
+//Messages setup - create message board for result and try again messages
+function setupMessages() {
+    console.log("setupMessages");
+    var texBoard = resources[MessageBoard].texture,
+        texMessage = resources[TryAgainBlu].texture,
+        sprBoard = new PIXI.Sprite(texBoard);
+    sprMessage = new PIXI.Sprite(texMessage);
+    sprBoard.anchor.set(0.5, 0.5);
+    sprMessage.anchor.set(0.5, 0.5);
+    sprBoard.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    sprMessage.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    messageContainer = new PIXI.Container();
+    messageContainer.addChild(sprBoard);
+    messageContainer.addChild(sprMessage);
+    messageContainer.visible = false;
+    Stage.addChild(messageContainer);
+}
+
+//Preview setup - create arrow to feedback input and shadow chip to clarify options
+function setupPreview() {
+    console.log("setupPreview");
+    var texArrow = resources[Arrow].texture,
+        texShadow = resources[ShadowBlu].texture;
+    rectArrow = new PIXI.Rectangle(0, InitFieldSize, InitFieldSize, InitFieldSize);
+    texArrow.frame = rectArrow;
+    sprArrow = new PIXI.Sprite(texArrow);
+    sprShadow = new PIXI.Sprite(texShadow);
+    sprShadow.y = (InitBoardHeight - 1) * InitFieldSize;
+    arrowContainer = new PIXI.Container();
+    arrowContainer.addChild(sprArrow);
+    arrowContainer.addChild(sprShadow);
+    arrowContainer.setChildIndex(sprShadow, 0);
+    Stage.addChild(arrowContainer);
+}
+
+//Stage setup - create new stage and setup sprites
+function setupStage() {
+    console.log("setupStage");
+    Stage = new PIXI.Container();
+    setupBoard();
+    setupMessages();
+    setupPreview();
+}
+
+//Feedback function - render the stage continuously
+function feedbackLoop() {
+    requestAnimationFrame(feedbackLoop);
+    renderer.render(Stage);
+}
+
+//Setup function - call setup and feedback loop functions
+function setup() {
+    console.log("setup");
+    setupCanvas();
+    newGameScene();
+    feedbackLoop();
+}
+
+//Starts a new game
+function newGameScene() {
+    console.log("newGameScene");
+    setInitControls();
+    setInitLogic();
+    setupStage();
+}
 
 //Load sprites, call setup function
 PIXI.loader
@@ -199,75 +299,6 @@ PIXI.loader
         ResultTie
     ])
     .load(setup);
-
-//Board setup - create the board and interactive slot containers
-function setupBoard() {
-    console.log("setupBoard");
-    var i,
-        j,
-        slot,
-        texField = resources[FieldVac].texture,
-        sprField;
-    for (i = 0; i < InitBoardWidth; i += 1) {
-        slot = new PIXI.Container();
-        clickable(slot);
-        for (j = 0; j < InitBoardHeight; j += 1) {
-            sprField = new PIXI.Sprite(texField);
-            sprField.x = InitFieldSize * i;
-            sprField.y = InitFieldSize * j;
-            slot.addChild(sprField);
-        }
-        Stage.addChild(slot);
-        Stage.setChildIndex(slot, 0);
-    }
-}
-
-//Messages setup - create message board for result and try again messages
-function setupMessages() {
-    console.log("setupMessages");
-    var texBoard = resources[MessageBoard].texture,
-        texMessage = resources[TryAgainBlu].texture,
-        sprBoard = new PIXI.Sprite(texBoard);
-    sprMessage = new PIXI.Sprite(texMessage);
-    sprBoard.anchor.set(0.5, 0.5);
-    sprMessage.anchor.set(0.5, 0.5);
-    sprBoard.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
-    sprMessage.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
-    messageContainer.addChild(sprBoard);
-    messageContainer.addChild(sprMessage);
-    messageContainer.visible = false;
-}
-
-//Preview setup - create arrow to feedback input and shadow chip to clarify options
-function setupPreview() {
-    console.log("setupPreview");
-    var texArrow = resources[Arrow].texture,
-        texShadow = resources[ShadowBlu].texture;
-    texArrow.frame = rectArrow;
-    sprArrow = new PIXI.Sprite(texArrow);
-    sprShadow = new PIXI.Sprite(texShadow);
-    sprShadow.y = (InitBoardHeight - 1) * InitFieldSize;
-    arrowContainer.addChild(sprArrow);
-    arrowContainer.addChild(sprShadow);
-    arrowContainer.setChildIndex(sprShadow, 0);
-}
-
-//Feedback function - render the stage continuously
-function feedbackLoop() {
-    requestAnimationFrame(feedbackLoop);
-    
-    renderer.render(Stage);
-}
-
-//Setup function - call setup and feedback loop functions
-function setup() {
-    console.log("setup");
-    setupBoard();
-    setupMessages();
-    setupPreview();
-    
-    feedbackLoop();
-}
 
 //Render try again message for limited time
 function feedbackTryAgain() {
@@ -310,6 +341,7 @@ function feedbackGameOver() {
         rocketSpeed = 0.5,
         rockets = true,
         traveling = false,
+        firstLoop = true,
         animFrameCount = 8,
         animRocket,
         animDelayCounter = 0,
@@ -320,23 +352,31 @@ function feedbackGameOver() {
         rockets = false;
         break;
     case 1:
-        //texNameMessage = ResultBlu;
+        texNameMessage = ResultBlu;
         texNameRocket = RocketBlu;
         break;
     case 2:
-        //texNameMessage = ResultRed;
+        texNameMessage = ResultRed;
         texNameRocket = RocketRed;
         break;
     }
-    //sprMessage.texture = resources[texNameMessage].texture;
-    texRocket = resources[texNameRocket].texture;
-    sprRocket = new PIXI.Sprite(texRocket);
-    sprRocket.texture.frame = rect;
-    sprRocket.y = InitBoardHeight * InitFieldSize;
+    sprMessage.texture = resources[texNameMessage].texture;
+    if (rockets) {
+        texRocket = resources[texNameRocket].texture;
+        sprRocket = new PIXI.Sprite(texRocket);
+        sprRocket.texture.frame = rect;
+        sprRocket.y = InitBoardHeight * InitFieldSize;
+        Stage.addChild(sprRocket);
+    }
+    
     animRocket = setInterval(function () {
         if (animDelayCounter < resultDelay) {
             animDelayCounter += 1;
         } else {
+            if (firstLoop) {
+                messageContainer.visible = true;
+                firstLoop = false;
+            }
             if (rockets) {
                 if (animLoopCounter % animFrameCount === 0) {
                     rect.x = 0;
@@ -363,16 +403,11 @@ function feedbackGameOver() {
                     animLoopCounter += 1;
                 }
                 sprRocket.texture.frame = rect;
-            } else {
-                messageContainer.visible = true;
+            } else if (!rockets || !GameOver) {
                 clearInterval(animRocket);
             }
         }
     }, animFrameLength);
-    
-    if (rockets) {
-        Stage.addChild(sprRocket);
-    }
 }
 
 //After a short impact delay, present winner chips or re-enable input
@@ -400,6 +435,11 @@ function feedbackWin(chipColor) {
     sprEffect = new PIXI.Sprite(texEffect);
     sprEffect.texture.frame = rect;
     sprEffect.visible = false;
+    if (GameOver) {
+        console.log("win");
+        chipContainer.addChild(sprEffect);
+    }
+    
     animWin = setInterval(function () {
         if (delayCounter < impactDelay) {
             delayCounter += 1;
@@ -419,7 +459,6 @@ function feedbackWin(chipColor) {
                     } else {
                         animLoopCounter += 1;
                     }
-                    //console.log(animRunCount + "; " + rect.y + "; " + ArrayWinX[animRunCount] + "; " + ArrayWinY[animRunCount]);
                 } else {
                     sprEffect.visible = false;
                     feedbackGameOver();
@@ -432,11 +471,6 @@ function feedbackWin(chipColor) {
             }
         }
     }, animFrameLength);
-    
-    if (GameOver) {
-        console.log("win");
-        chips.addChild(sprEffect);
-    }
 }
 
 //The impact effect
@@ -457,6 +491,7 @@ function feedbackImpact(sprChip, rect, chipColor) {
     rect.x = InitFieldSize;
     rect.y = 0;
     sprChip.texture.frame = rect;
+    
     animImpact = setInterval(function () {
         animLoopCounter += 1;
         if (animLoopCounter < animCounterStop) {
@@ -496,6 +531,8 @@ function feedbackDrop(vx, vy) {
     sprChip.texture.frame = rect;
     sprChip.x = InitFieldSize * vx;
     sprChip.y = 0;
+    chipContainer.addChild(sprChip);
+    
     animDrop = setInterval(function () {
         if (firstLoop) {
             firstLoop = false;
@@ -517,8 +554,6 @@ function feedbackDrop(vx, vy) {
         sprChip.y = animLoopCounter * InitFieldSize;
         sprChip.texture.frame = rect;
     }, animFrameLength);
-    
-    chips.addChild(sprChip);
 }
 
 //Arrow responds to input
@@ -527,6 +562,7 @@ function feedbackInput(vx, vy) {
     var animInput,
         animLoopCounter = 2,
         animCounterStop = 4;
+    
     animInput = setInterval(function () {
         if (animLoopCounter < animCounterStop) {
             rectArrow.y = animLoopCounter * InitFieldSize;
@@ -706,7 +742,6 @@ function validInput(SlotIndex) {
     var SlotField = ArraySlotVacancy[SlotIndex];
     FieldsVacant -= 1;
     ArrayFieldValues[SlotIndex][SlotField] = PlayerTurn;
-    //console.log("Fields left: " + FieldsVacant + "; Player " + PlayerTurn + " dropped at [x: " + SlotIndex + "; y: " + SlotField + "]");
     if (!checkWin(SlotIndex, SlotField)) {
         if (!checkTie()) {
             nextPlayersTurn();
@@ -736,18 +771,27 @@ function branchInputValid(SlotIndex) {
 /*====== Mouse ======*/
 
 //The position of the mouse inside of the canvas
-var MousePos = renderer.plugins.interaction.mouse.global;
+var MousePos;
+function enableMouseListener() {
+    MousePos = renderer.plugins.interaction.mouse.global;
+}
 
 //The currently selected slot
-var SelectionInput = 0;
+var SelectionInput;
 
 //Whether or not the player can create input - disable while simulating
-var AllowInput = true;
+var AllowInput;
+
+//Set controls to start condition
+function setInitControls() {
+    SelectionInput = 0;
+    setPlayerInput(true);
+    enableMouseListener();
+}
 
 //Disable player input while simulating, enable afterwards
 function setPlayerInput(playerInput) {
     AllowInput = playerInput;
-    //feedbackInputAllowed();
 }
 
 //Called when Enter is pressed or the mouse clicked
@@ -841,7 +885,6 @@ function keyboard(keyCode) {
             key.isDown = true;
             key.isUp = false;
         }
-        //event.preventDefault();
     };
     
     key.upHandler = function (event) {
@@ -852,7 +895,6 @@ function keyboard(keyCode) {
             key.isDown = false;
             key.isUp = true;
         }
-        //event.preventDefault();
     };
     
     window.addEventListener(
@@ -886,4 +928,10 @@ keyRight.press = function () {
 var keyEnter = keyboard(13);
 keyEnter.press = function () {
     hardInput();
+};
+
+//'R' key event
+var keyR = keyboard(82);
+keyR.press = function () {
+    newGameScene();
 };
