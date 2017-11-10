@@ -9,6 +9,7 @@ body {
 #display>* {
     margin: 20px auto 10px;
     border: 8px solid #DEEED6;
+    image-rendering: pixelated;
 }
 
 

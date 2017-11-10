@@ -177,7 +177,7 @@ var renderer;
 //Canvas setup - create canvas element with dark background, append it to div and create mouse position variable relative to it
 function setupCanvas() {
     console.log("setupCanvas");
-    renderer = PIXI.autoDetectRenderer(getCanvasWidth(), getCanvasHeight(), {
+    renderer = new PIXI.CanvasRenderer(getCanvasWidth(), getCanvasHeight(), {
         antialias: false,
         transparent: false,
         resolution: 1
@@ -403,7 +403,8 @@ function feedbackGameOver() {
                     animLoopCounter += 1;
                 }
                 sprRocket.texture.frame = rect;
-            } else if (!rockets || !GameOver) {
+            }
+            if (!GameOver || !rockets) {
                 clearInterval(animRocket);
             }
         }
