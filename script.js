@@ -132,6 +132,9 @@ var impactDelay = 7;
 //How many frames after the game ends before the result screen pops up
 var resultDelay = 15;
 
+//How many pixels the replay button is offset on y axis after centered
+var replayBtnOffset = 54;
+
 //Shortcuts & aliases
 var resources = PIXI.loader.resources;
 var Div = document.getElementById('display');
@@ -154,6 +157,7 @@ var RocketRed = "img/rocket_red.png";
 var ResultBlu = "img/result_blue.png";
 var ResultRed = "img/result_red.png";
 var ResultTie = "img/result_tie.png";
+var ButtonReplay = "img/btn_replay_SINGLE.png";
 
 //Root container object
 var Stage;
@@ -163,6 +167,8 @@ var chipContainer;
 
 //Message board container
 var sprMessage;
+var sprBtnReplay;
+var rectBtnReplay;
 var messageContainer;
 
 //Input helper arrow and preview chip container
@@ -173,6 +179,15 @@ var arrowContainer;
 
 //Renderer / canvas element
 var renderer;
+
+//Set a given sprite to a given texture and center it to the screen
+function centeredSprite(img) {
+    var nTex = resources[img].texture,
+        spr = new PIXI.Sprite(nTex);
+    spr.anchor.set(0.5, 0.5);
+    spr.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    return spr;
+}
 
 //Canvas setup - create canvas element with dark background, append it to div and create mouse position variable relative to it
 function setupCanvas() {
@@ -196,7 +211,7 @@ function setupBoard() {
         sprField;
     for (i = 0; i < InitBoardWidth; i += 1) {
         slot = new PIXI.Container();
-        clickable(slot);
+        clickable(slot, false, undefined);
         for (j = 0; j < InitBoardHeight; j += 1) {
             sprField = new PIXI.Sprite(texField);
             sprField.x = InitFieldSize * i;
@@ -213,17 +228,16 @@ function setupBoard() {
 //Messages setup - create message board for result and try again messages
 function setupMessages() {
     console.log("setupMessages");
-    var texBoard = resources[MessageBoard].texture,
-        texMessage = resources[TryAgainBlu].texture,
-        sprBoard = new PIXI.Sprite(texBoard);
-    sprMessage = new PIXI.Sprite(texMessage);
-    sprBoard.anchor.set(0.5, 0.5);
-    sprMessage.anchor.set(0.5, 0.5);
-    sprBoard.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
-    sprMessage.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
+    var sprBoard = centeredSprite(MessageBoard);
+    sprMessage = centeredSprite(TryAgainBlu);
+    sprBtnReplay = centeredSprite(ButtonReplay);
+    sprBtnReplay.y += replayBtnOffset;
+    //rectBtnReplay = new PIXI.Rectangle(0, 0, sprBtnReplay.texture.width, sprBtnReplay.texture.height / 3);
+    //sprBtnReplay.texture.frame = rectBtnReplay;
     messageContainer = new PIXI.Container();
     messageContainer.addChild(sprBoard);
     messageContainer.addChild(sprMessage);
+    messageContainer.addChild(sprBtnReplay);
     messageContainer.visible = false;
     Stage.addChild(messageContainer);
 }
@@ -296,7 +310,8 @@ PIXI.loader
         RocketRed,
         ResultBlu,
         ResultRed,
-        ResultTie
+        ResultTie,
+        ButtonReplay
     ])
     .load(setup);
 
@@ -316,6 +331,7 @@ function feedbackTryAgain() {
     }
     sprMessage.texture = resources[texName].texture;
     messageContainer.visible = true;
+    sprBtnReplay.visible = false;
     
     showAndHide = setInterval(function () {
         if (showCounter === messageTime) {
@@ -361,6 +377,8 @@ function feedbackGameOver() {
         break;
     }
     sprMessage.texture = resources[texNameMessage].texture;
+    clickable(sprBtnReplay, true, "replay");
+    sprBtnReplay.visible = true;
     if (rockets) {
         texRocket = resources[texNameRocket].texture;
         sprRocket = new PIXI.Sprite(texRocket);
@@ -820,7 +838,7 @@ function mouseToSelection() {
 }
 
 //When mouse (or other pointer) hovers over a slot
-function onPoint() {
+function onPointSlot() {
     SelectionInput = mouseToSelection();
     if (AllowInput) {
         feedbackSelection();
@@ -828,16 +846,35 @@ function onPoint() {
 }
 
 //When a slot is clicked (or tapped)
-function onClick() {
+function onClickSlot() {
     hardInput();
 }
 
-//Enable interactivity for mouse/touch
-function clickable(dispObj) {
+//When mouse (or other pointer) hovers over a button
+function onPointButton(sprBtn) {
+    //sprBtn.texture.frame.y = 0;
+}
+
+//When the replay button is clicked (or tapped)
+function onClickReplay() {
+    newGameScene();
+}
+
+//Enable button interactivity for mouse/touch
+function clickable(dispObj, isButton, buttonValue) {
     dispObj.interactive = true;
     dispObj.buttonMode = true;
-    dispObj.on('pointerover', onPoint);
-    dispObj.on('pointerdown', onClick);
+    if (isButton) {
+        dispObj.on('pointerover', onPointButton(dispObj));
+        switch (buttonValue) {
+        case "replay":
+            dispObj.on('pointerdown', onClickReplay);
+            break;
+        }
+    } else {
+        dispObj.on('pointerover', onPointSlot);
+        dispObj.on('pointerdown', onClickSlot);
+    }
 }
 
 
