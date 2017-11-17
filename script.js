@@ -1,5 +1,7 @@
 "use strict";
 
+//var PIXI = require('./pixi');
+
 /*====== Init variables - initially set ======*/
 
 //Amount of players participating
@@ -127,13 +129,19 @@ var animFrameLength = 60;
 var messageTime = 7;
 
 //How many frames after the chip has landed before input is enabled
-var impactDelay = 7;
+var impactDelay = 5;
 
 //How many frames after the game ends before the result screen pops up
 var resultDelay = 15;
 
 //How many pixels the replay button is offset on y axis after centered
 var replayBtnOffset = 54;
+
+//How many pixels a button measures in height
+var btnHeight = 52;
+
+//For how many frames a button shows his pressed state
+var btnDelay = 7;
 
 //Shortcuts & aliases
 var resources = PIXI.loader.resources;
@@ -157,13 +165,14 @@ var RocketRed = "img/rocket_red.png";
 var ResultBlu = "img/result_blue.png";
 var ResultRed = "img/result_red.png";
 var ResultTie = "img/result_tie.png";
-var ButtonReplay = "img/btn_replay_SINGLE.png";
+var ButtonReplay = "img/btn_replay.png";
 
 //Root container object
 var Stage;
 
-//Chip container
+//Chip container & slot container
 var chipContainer;
+var slotContainer;
 
 //Message board container
 var sprMessage;
@@ -181,12 +190,19 @@ var arrowContainer;
 var renderer;
 
 //Set a given sprite to a given texture and center it to the screen
-function centeredSprite(img) {
-    var nTex = resources[img].texture,
-        spr = new PIXI.Sprite(nTex);
+function centeredSprite(nTex) {
+    var spr = new PIXI.Sprite(nTex);
     spr.anchor.set(0.5, 0.5);
     spr.position.set(0.5 * getCanvasWidth(), 0.5 * getCanvasHeight());
     return spr;
+}
+
+//Disables board's interactivity
+function noBoardInteractivity() {
+    var i;
+    for (i = 0; i < InitBoardWidth; i += 1) {
+        unclickable(slotContainer.children[i]);
+    }
 }
 
 //Canvas setup - create canvas element with dark background, append it to div and create mouse position variable relative to it
@@ -209,6 +225,7 @@ function setupBoard() {
         slot,
         texField = resources[FieldVac].texture,
         sprField;
+    slotContainer = new PIXI.Container();
     for (i = 0; i < InitBoardWidth; i += 1) {
         slot = new PIXI.Container();
         clickable(slot, false, undefined);
@@ -218,9 +235,10 @@ function setupBoard() {
             sprField.y = InitFieldSize * j;
             slot.addChild(sprField);
         }
-        Stage.addChild(slot);
-        Stage.setChildIndex(slot, 0);
+        slotContainer.addChild(slot);
     }
+    Stage.addChild(slotContainer);
+    Stage.setChildIndex(slotContainer, 0);
     chipContainer = new PIXI.Container();
     Stage.addChild(chipContainer);
 }
@@ -228,12 +246,15 @@ function setupBoard() {
 //Messages setup - create message board for result and try again messages
 function setupMessages() {
     console.log("setupMessages");
-    var sprBoard = centeredSprite(MessageBoard);
-    sprMessage = centeredSprite(TryAgainBlu);
-    sprBtnReplay = centeredSprite(ButtonReplay);
+    var texBoard = resources[MessageBoard].texture,
+        texMessage = resources[TryAgainBlu].texture,
+        texBtnReplay = resources[ButtonReplay].texture,
+        sprBoard = centeredSprite(texBoard);
+    sprMessage = centeredSprite(texMessage);
+    rectBtnReplay = new PIXI.Rectangle(0, 0, texBtnReplay.width, btnHeight);
+    texBtnReplay.frame = rectBtnReplay;
+    sprBtnReplay = centeredSprite(texBtnReplay);
     sprBtnReplay.y += replayBtnOffset;
-    //rectBtnReplay = new PIXI.Rectangle(0, 0, sprBtnReplay.texture.width, sprBtnReplay.texture.height / 3);
-    //sprBtnReplay.texture.frame = rectBtnReplay;
     messageContainer = new PIXI.Container();
     messageContainer.addChild(sprBoard);
     messageContainer.addChild(sprMessage);
@@ -315,38 +336,22 @@ PIXI.loader
     ])
     .load(setup);
 
-//Render try again message for limited time
-function feedbackTryAgain() {
-    console.log("feedbackTryAgain");
-    var texName,
-        showAndHide,
-        showCounter = 0;
-    switch (PlayerTurn) {
-    case 1:
-        texName = TryAgainBlu;
-        break;
-    case 2:
-        texName = TryAgainRed;
-        break;
-    }
-    sprMessage.texture = resources[texName].texture;
-    messageContainer.visible = true;
-    sprBtnReplay.visible = false;
-    
-    showAndHide = setInterval(function () {
-        if (showCounter === messageTime) {
-            clearInterval(showAndHide);
-            messageContainer.visible = false;
-            setPlayerInput(true);
-            feedbackInputAllowed();
-        }
-        showCounter += 1;
-    }, animFrameLength);
+//Render pressing the replay button
+function feedbackReplay() {
+    var delayCounter = 0,
+        replayDelay = setInterval(function () {
+            if (delayCounter === btnDelay) {
+                newGameScene();
+                clearInterval(replayDelay);
+            }
+            delayCounter += 1;
+        }, animFrameLength);
+    rectBtnReplay.y = btnHeight * 2;
+    sprBtnReplay.texture.frame = rectBtnReplay;
 }
 
 //Render result message
 function feedbackGameOver() {
-    console.log("feedbackGameOver");
     var texNameMessage,
         texNameRocket,
         texSizeRocket = InitFieldSize * 2,
@@ -377,6 +382,7 @@ function feedbackGameOver() {
         break;
     }
     sprMessage.texture = resources[texNameMessage].texture;
+    noBoardInteractivity();
     clickable(sprBtnReplay, true, "replay");
     sprBtnReplay.visible = true;
     if (rockets) {
@@ -386,7 +392,7 @@ function feedbackGameOver() {
         sprRocket.y = InitBoardHeight * InitFieldSize;
         Stage.addChild(sprRocket);
     }
-    
+
     animRocket = setInterval(function () {
         if (animDelayCounter < resultDelay) {
             animDelayCounter += 1;
@@ -431,7 +437,6 @@ function feedbackGameOver() {
 
 //After a short impact delay, present winner chips or re-enable input
 function feedbackWin(chipColor) {
-    console.log("feedbackWin");
     var texName,
         texEffect,
         sprEffect,
@@ -458,7 +463,7 @@ function feedbackWin(chipColor) {
         console.log("win");
         chipContainer.addChild(sprEffect);
     }
-    
+
     animWin = setInterval(function () {
         if (delayCounter < impactDelay) {
             delayCounter += 1;
@@ -494,7 +499,6 @@ function feedbackWin(chipColor) {
 
 //The impact effect
 function feedbackImpact(sprChip, rect, chipColor) {
-    console.log("feedbackImpact");
     var texName,
         animImpact,
         animLoopCounter = 0,
@@ -510,7 +514,7 @@ function feedbackImpact(sprChip, rect, chipColor) {
     rect.x = InitFieldSize;
     rect.y = 0;
     sprChip.texture.frame = rect;
-    
+
     animImpact = setInterval(function () {
         animLoopCounter += 1;
         if (animLoopCounter < animCounterStop) {
@@ -528,7 +532,6 @@ function feedbackImpact(sprChip, rect, chipColor) {
 
 //The falling animation
 function feedbackDrop(vx, vy) {
-    console.log("feedbackDrop");
     var texName,
         chipColor = ArrayFieldValues[vx][vy],
         rect = new PIXI.Rectangle(0, 0, InitFieldSize, InitFieldSize),
@@ -551,7 +554,7 @@ function feedbackDrop(vx, vy) {
     sprChip.x = InitFieldSize * vx;
     sprChip.y = 0;
     chipContainer.addChild(sprChip);
-    
+
     animDrop = setInterval(function () {
         if (firstLoop) {
             firstLoop = false;
@@ -577,11 +580,10 @@ function feedbackDrop(vx, vy) {
 
 //Arrow responds to input
 function feedbackInput(vx, vy) {
-    console.log("feedbackInput");
     var animInput,
         animLoopCounter = 2,
         animCounterStop = 4;
-    
+
     animInput = setInterval(function () {
         if (animLoopCounter < animCounterStop) {
             rectArrow.y = animLoopCounter * InitFieldSize;
@@ -595,9 +597,36 @@ function feedbackInput(vx, vy) {
     }, animFrameLength);
 }
 
+//Render try again message for limited time
+function feedbackTryAgain() {
+    var texName,
+        showAndHide,
+        showCounter = 0;
+    switch (PlayerTurn) {
+    case 1:
+        texName = TryAgainBlu;
+        break;
+    case 2:
+        texName = TryAgainRed;
+        break;
+    }
+    sprMessage.texture = resources[texName].texture;
+    messageContainer.visible = true;
+    sprBtnReplay.visible = false;
+
+    showAndHide = setInterval(function () {
+        if (showCounter === messageTime) {
+            messageContainer.visible = false;
+            setPlayerInput(true);
+            feedbackInputAllowed();
+            clearInterval(showAndHide);
+        }
+        showCounter += 1;
+    }, animFrameLength);
+}
+
 //Render the arrow and the chip preview
 function feedbackSelection() {
-    console.log("feedbackSelection");
     var rectPosX,
         texName;
     switch (PlayerTurn) {
@@ -624,7 +653,6 @@ function feedbackSelection() {
 
 //Sets visibility of the arrow and shadow according to whether or not input is allowed
 function feedbackInputAllowed() {
-    console.log("feedbackInputAllowed");
     if (AllowInput) {
         feedbackSelection();
         arrowContainer.visible = true;
@@ -677,12 +705,12 @@ function checkWin(vx, vy) {
         arrayStart = maxLength - 1;
     ArrayWinX[arrayStart] = vx;
     ArrayWinY[arrayStart] = vy;
-        
+
     for (direction = 0; direction < 4; direction += 1) {
         counter = 1;
         positiveCount = true;
         negativeCount = true;
-            
+
         switch (direction) {
         case 0:             //Horizontal
             dx = 1;
@@ -701,7 +729,7 @@ function checkWin(vx, vy) {
             dy = 1;
             break;
         }
-        
+
         for (i = 1; i < maxLength; i += 1) {
             if (positiveCount) {
                 checkX = vx + i * dx;
@@ -726,7 +754,7 @@ function checkWin(vx, vy) {
                 }
             }
         }
-        
+
         if (counter >= maxLength) {
             winCondFulfilled = true;
             break;
@@ -852,12 +880,19 @@ function onClickSlot() {
 
 //When mouse (or other pointer) hovers over a button
 function onPointButton(sprBtn) {
-    //sprBtn.texture.frame.y = 0;
+    sprBtn.texture.frame.y += btnHeight;
+    //console.log("point");
+}
+
+//When mouse (or other pointer) stops hovering over a button
+function onUnpointButton(sprBtn) {
+    sprBtn.texture.frame.y -= btnHeight;
+    //console.log("no point");
 }
 
 //When the replay button is clicked (or tapped)
 function onClickReplay() {
-    newGameScene();
+    feedbackReplay();
 }
 
 //Enable button interactivity for mouse/touch
@@ -865,7 +900,8 @@ function clickable(dispObj, isButton, buttonValue) {
     dispObj.interactive = true;
     dispObj.buttonMode = true;
     if (isButton) {
-        dispObj.on('pointerover', onPointButton(dispObj));
+        //dispObj.on('pointerover', onPointButton(dispObj));
+        //dispObj.on('pointerout', onUnpointButton(dispObj));
         switch (buttonValue) {
         case "replay":
             dispObj.on('pointerdown', onClickReplay);
@@ -875,6 +911,12 @@ function clickable(dispObj, isButton, buttonValue) {
         dispObj.on('pointerover', onPointSlot);
         dispObj.on('pointerdown', onClickSlot);
     }
+}
+
+//Disable button interactivity for mouse/touch
+function unclickable(dispObj) {
+    dispObj.interactive = false;
+    dispObj.buttonMode = false;
 }
 
 
@@ -914,7 +956,7 @@ function keyboard(keyCode) {
     key.isUp = true;
     key.press = undefined;
     key.release = undefined;
-    
+
     key.downHandler = function (event) {
         if (event.keyCode === key.code) {
             if (key.isUp && key.press) {
@@ -924,7 +966,7 @@ function keyboard(keyCode) {
             key.isUp = false;
         }
     };
-    
+
     key.upHandler = function (event) {
         if (event.keyCode === key.code) {
             if (key.isDown && key.release) {
@@ -934,19 +976,19 @@ function keyboard(keyCode) {
             key.isUp = true;
         }
     };
-    
+
     window.addEventListener(
         "keydown",
         key.downHandler.bind(key),
         false
     );
-    
+
     window.addEventListener(
         "keyup",
         key.upHandler.bind(key),
         false
     );
-    
+
     return key;
 }
 
