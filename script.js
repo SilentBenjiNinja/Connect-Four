@@ -141,7 +141,7 @@ var replayBtnOffset = 54;
 var btnHeight = 52;
 
 //For how many frames a button shows his pressed state
-var btnDelay = 7;
+var btnDelay = 3;
 
 //Shortcuts & aliases
 var resources = PIXI.loader.resources;
